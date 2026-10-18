@@ -28,17 +28,16 @@ ERA5_PRESSURE_LEVELS_VARIABLES = [
 
 MONTHS = ["01"]  # [f"{m:02d}" for m in range(1, 13)]
 # fmt: off
-ALL_PRESSURE_LEVELS = (
-    [
-        "1",   "2",   "3",   "5",   "7",   "10",
-        "20",  "30",  "50",  "70",  "100", "125",
-        "150", "175", "200", "225", "250", "300",
-        "350", "400", "450", "500", "550", "600",
-        "650", "700", "750", "775", "800", "825",
-        "850", "875", "900", "925", "950", "975",
-        "1000",
-    ],
-)
+ALL_PRESSURE_LEVELS = [
+  "1",   "2",   "3",   "5",   "7",   "10",
+  "20",  "30",  "50",  "70",  "100", "125",
+  "150", "175", "200", "225", "250", "300",
+  "350", "400", "450", "500", "550", "600",
+  "650", "700", "750", "775", "800", "825",
+  "850", "875", "900", "925", "950", "975",
+  "1000",
+]
+
 # fmt: on
 
 DATA_PATH_ERA5 = Path("data/era5")
@@ -85,7 +84,7 @@ def retrieve_era5_plevl(years: list[int], data_path: Path = DATA_PATH_ERA5):
             {
                 "product_type": "monthly_averaged_reanalysis",
                 "pressure_level": ALL_PRESSURE_LEVELS,
-                "variable": ["specific_humidity", "temperature"],
+                "variable": ERA5_PRESSURE_LEVELS_VARIABLES,
                 "year": year,
                 "month": MONTHS,
                 "time": "00:00",
