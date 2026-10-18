@@ -1,10 +1,9 @@
-from pathlib import Path
 from sys import stdout
 
 import numpy as np
 import xarray as xr
 from rrtmg_lw_input import RRTMG_LW_INPUT
-from scipy.interpolate import interpn
+from scipy.interpolate import make_interp_spline
 
 # fmt: off
 N_A = 6.02e23 #      avagadro's number
@@ -37,9 +36,17 @@ def broad(p: np.ndarray, wkl: np.ndarray):
 
     dp = p[:-1] - p[1:]
     dry_air = dp * 1e3 * N_A / (1e2 * (g * amm * (1 + h2ovmr)))
-    summol = wkl.sum(axis=1)
+    summol = wkl.sum(axis=0)
     wbroadl = dry_air * (1 - summol)
     return wbroadl
+
+
+def vmr(q):
+    eps = 0.622
+    w = q / (1.0 - q)
+    vmr = w / eps
+    vmr_ppmv = vmr * 1e6
+    return vmr_ppmv
 
 
 def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
@@ -51,13 +58,13 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
     skt: era5 skin temperature (skt)
     """
 
-    plev = plev_ds["plev"].to_numpy()
-    t = plev_ds["t"].to_numpy()
-    p0 = sp
+    plev = np.flip(plev_ds["level"].to_numpy()).astype(np.float64)
+    t = np.flip(plev_ds["t"].to_numpy())
+    p0 = sp / 100
     t0 = skt
 
     # pick where era5_pressure_level < sp
-    mask = plev_ds.plev < p0
+    mask = plev < p0
 
     # pressure level arrangement (expanded)
     # -------------------------------------------------------------------------
@@ -81,14 +88,18 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
 
     # top-of-layer pressure and temperatures
     p1 = np.zeros_like(pave)
-    p1[:n_lev] = 0.5 * (pave[1:] + pave[:-1])
-    p1[: n_lev - 1] = 0.5
+    p1[:-1] = 0.5 * (pave[1:] + pave[:-1])
+    p1[-1] = 0.5
 
     # temperature at interfaces by linear interpolation on log(p)
-    t1 = interpn(
-        np.log(pave), tave, np.log(p1), method="linear", fill_value="extrapolate"
-    )
-    t1[: n_lev - 1] = tave[n_lev - 1]
+    print(p0)
+    print(t0)
+    print(pave)
+    print(tave)
+    print(p1)
+    spl = make_interp_spline(x=-np.log(pave), y=-tave, k=1)  # k=1 linear
+    t1 = -spl(-np.log(p1), extrapolate="true")
+    t1[-1] = tave[-1]
 
     # pressure interfaces for wkl calculation
     pint = np.zeros(n_lev + 1)
@@ -97,13 +108,13 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
 
     # wkl fill values
     wkl = np.zeros((7, n_lev))
-    wkl[0] = plev_ds['q'].to_numpy()
-    wkl[1] = plev_ds['co2'].to_numpy()
-    wkl[2] = plev_ds['o3'].to_numpy()
-    wkl[3] = 3.16e-07 # n20 vmr
-    wkl[4] = 1.5e-7   # CO vmr
-    wkl[5] = 1.8*1e-6 # ch4 vmr
-    wkl[6] = 0.209    # O2 cmr 20.9%
+    wkl[0] = vmr(plev_ds["q"].to_numpy()[mask])
+    wkl[1] = 330e-6  # co2 vmr
+    wkl[2] = plev_ds["o3"].to_numpy()[mask]
+    wkl[3] = 3.16e-07  # n20 vmr
+    wkl[4] = 1.5e-7  # CO vmr
+    wkl[5] = 1.8 * 1e-6  # ch4 vmr
+    wkl[6] = 0.209  # O2 cmr 20.9%
 
     # broadening calculation
     wbroadl = broad(pint, wkl)
@@ -112,16 +123,18 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
 
 
 def main():
-    profile_path = Path("")
-    ds_atm = xr.open_dataset(profile_path)
-    ds_sfc = xr.open_dataset(profile_path)
+    sel_kwarg = {"latitude": 45, "longitude": 73}
+    ds_atm = xr.open_dataset("data/era5/era5_plev_qt_monthly_2020.nc").sel(sel_kwarg)
+    ds_sfc = xr.open_dataset("data/era5/era5_single_levels_monthly_2020.nc").sel(
+        sel_kwarg
+    )
 
-    clouds = 1
+    clouds = 0
     input_builder = RRTMG_LW_INPUT(
         cxid="test input",
         iaer=0,
         iatm=0,
-        ixsect=0,
+        ixsect=1,
         numangs=0,
         iout=99,
         idrv=0,
@@ -141,7 +154,7 @@ def main():
     )
     input_builder.set_fields_rrtatm0(
         iform=0,
-        nlayrs=37,
+        nlayrs=len(pave),
         ixmols=7,
         nmol=7,
         pave=pave,

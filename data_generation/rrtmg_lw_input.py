@@ -109,7 +109,7 @@ class RRTMG_LW_INPUT:
         self.idrv = idrv
         self.imca = imca
 
-        assert icld in {1, 2}, "only no cloudy layers and random overlap is implemented"
+        assert icld in {0, 1}, "only no cloudy layers and random overlap is implemented"
         assert ixsect == 1, "no cross-sections included in calculation implemented"
         self.icld = icld
 
@@ -367,17 +367,15 @@ class RRTMG_LW_INPUT:
 
     def _write_record_2_1(self, stream: TextIO):
         # record 2.1
-        stream.write(f"{self.iform:2d}{self.nlayrs:3d}{self.nmol:5d}")
+        stream.write(f"{self.iform:2d}{self.nlayrs:3d}{self.nmol:5d}\n")
 
         # record 2.1.1-2.1.3 for each layer
         if self.iform == 0:
             fmt_fn_pave = lambda x: f"{x:10.4f}"
             fmt_fn_wkl = lambda x: f"{x:10.3e}"
-            offset = 23
         if self.iform == 1:
             fmt_fn_pave = lambda x: f"{x:15.7e}"
             fmt_fn_wkl = lambda x: f"{x:15.7e}"
-            offset = 18
 
         for l in range(self.nlayrs):
             # record 2.1.1
@@ -388,8 +386,9 @@ class RRTMG_LW_INPUT:
             else:
                 pz0 = " " * 8
                 tz0 = " " * 7
+
             stream.write(
-                f"{fmt_fn_pave(self.pave[l])}{self.tave[l]:10.4f}{' ' * offset}{pz0}{tz0}{self.pz1:8.3f}{self.tz1:7.2f}\n"
+                f"{fmt_fn_pave(self.pave[l])}{self.tave[l]:10.4f}{' ' * 23}{pz0}{tz0}{' ' * 7}{self.pz1[l]:8.3f}{self.tz1[l]:7.2f}\n"
             )
 
             # record 2.1.2
