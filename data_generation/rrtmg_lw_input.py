@@ -110,7 +110,7 @@ class RRTMG_LW_INPUT:
         self.imca = imca
 
         assert icld in {0, 1}, "only no cloudy layers and random overlap is implemented"
-        assert ixsect == 1, "no cross-sections included in calculation implemented"
+        assert ixsect == 0, "no cross-sections included in calculation implemented"
         self.icld = icld
 
         # record 1.4

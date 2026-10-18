@@ -82,8 +82,8 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
     n_lev = len(pave)
 
     # pressure and temperature at bottom
-    tz0 = p0
-    pz0 = t0
+    tz0 = t0
+    pz0 = p0
 
     # top-of-layer pressure and temperatures
     p1 = np.zeros_like(pave)
@@ -130,7 +130,7 @@ def main():
         cxid="test input",
         iaer=0,
         iatm=0,
-        ixsect=1,
+        ixsect=0,
         numangs=0,
         iout=99,
         idrv=0,
