@@ -45,8 +45,7 @@ def vmr(q):
     eps = 0.622
     w = q / (1.0 - q)
     vmr = w / eps
-    vmr_ppmv = vmr * 1e6
-    return vmr_ppmv
+    return vmr
 
 
 def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
@@ -92,11 +91,6 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
     p1[-1] = 0.5
 
     # temperature at interfaces by linear interpolation on log(p)
-    print(p0)
-    print(t0)
-    print(pave)
-    print(tave)
-    print(p1)
     spl = make_interp_spline(x=-np.log(pave), y=-tave, k=1)  # k=1 linear
     t1 = -spl(-np.log(p1), extrapolate="true")
     t1[-1] = tave[-1]
@@ -118,6 +112,8 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
 
     # broadening calculation
     wbroadl = broad(pint, wkl)
+    print(wkl)
+    print(wbroadl)
 
     return pave, tave, pz0, tz0, p1, t1, wkl, wbroadl
 

@@ -392,16 +392,16 @@ class RRTMG_LW_INPUT:
             )
 
             # record 2.1.2
-            wkl_parts = self.wkl[:7, l].tolist() + self.wbroad[l]
-            wkl_parts_fmt = [f"{fmt_fn_wkl(x)}" for x in wkl_parts]
-            stream.write(f"{' '.join(wkl_parts_fmt)}\n")
+            wkl_parts = self.wkl[:7, l].tolist() + [self.wbroad[l]]
+            wkl_parts_fmt = [fmt_fn_wkl(x) for x in wkl_parts]
+            stream.write(f"{''.join(wkl_parts_fmt)}\n")
 
             # record 2.1.3 - only if nmol > 7
             if self.nmol <= 7:
                 continue
 
-            wkl_parts_fmt = [f"{fmt_fn_wkl(x)}" for x in self.wkl[7:, l]]
-            stream.write(f"{' '.join(wkl_parts_fmt)}\n")
+            wkl_parts_fmt = [fmt_fn_wkl(x) for x in self.wkl[7:, l]]
+            stream.write(f"{''.join(wkl_parts_fmt)}\n")
 
     def _write_record_2_2(self, stream: TextIO):
         pass
