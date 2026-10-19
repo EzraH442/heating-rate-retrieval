@@ -45,19 +45,17 @@ def vmr(q):
     return vmr
 
 
-def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
+def prepare_era5_profile(plev_ds: xr.Dataset, sp):
     """
     plev_ds: dataset containing:
       t: era5 temperature on pressure levels(t)
-      sp: era5 surface pressure (sp)
 
-    skt: era5 skin temperature (skt)
+    sp: surface pressure
     """
 
-    plev = np.flip(plev_ds["level"].to_numpy()).astype(np.float64)
-    t = np.flip(plev_ds["t"].to_numpy())
+    plev = plev_ds["level"].to_numpy().astype(np.float64)
+    t = plev_ds["t"].to_numpy()
     p0 = sp / 100
-    t0 = skt
 
     # pick where era5_pressure_level < sp
     mask = plev < p0
@@ -79,7 +77,7 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
     n_lev = len(pave)
 
     # pressure and temperature at bottom
-    tz0 = t0
+    tz0 = t[0]
     pz0 = p0
 
     # top-of-layer pressure and temperatures
@@ -109,7 +107,5 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp, skt):
 
     # broadening calculation
     wbroadl = broad(pint, wkl)
-    print(wkl)
-    print(wbroadl)
 
     return pave, tave, pz0, tz0, p1, t1, wkl, wbroadl

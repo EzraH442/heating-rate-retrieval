@@ -10,94 +10,103 @@ from tap import Tap
 
 class Parser(Tap):
     year: int
+    month: int
+    input_dir: Path = Path("data/era5_6hr_1.0")
     output_dir = Path("data/rrtmg")
 
     def process_args(self):
-        self.ds_atm_path = Path(f"data/era5/era5_plev_qt_monthly_{self.year}.nc")
-        self.ds_sfc_path = Path(f"data/era5/era5_plev_qt_monthly_{self.year}.nc")
-
         self.output_dir.mkdir(exist_ok=True, parents=True)
+
+
+def open_era5(input_dir: Path, year: int, month: int) -> xr.Dataset:
+    datasets = []
+    for var in ("o3", "q", "t", "sp", "skt"):
+        path = input_dir / var / f"{year}-{month:02d}.nc"
+        if not path.exists():
+            raise FileNotFoundError(path)
+        datasets.append(xr.open_dataset(path))
+
+    ds = xr.merge(datasets)
+    return ds.rename(
+        {
+            name: old
+            for name, old in {
+                "pressure_level": "level",
+                "valid_time": "time",
+            }.items()
+            if name in ds
+        }
+    )
 
 
 def main():
     args = Parser().parse_args()
-    ds_atm = xr.open_dataset(args.ds_atm_path)
-    ds_sfc = xr.open_dataset(args.ds_sfc_path)
-
-    toa_flux_lw: xr.DataArray = xr.zeros_like(ds_sfc.skt)
-    sfc_flux_lw: xr.DataArray = xr.zeros_like(ds_sfc.skt)
-    htr_lw: xr.DataArray = xr.zeros_like(ds_atm.level)
+    ds = open_era5(args.input_dir, args.year, args.month)
 
     tmpdir = args.output_dir / "_tmp"
-    N, M = len(ds_sfc.latitude), len(ds_sfc.longitude)
+    tmpdir.mkdir(exist_ok=True)
+    sample_dims = ds.skt.dims
+    toa_flux_lw = xr.full_like(ds.skt, np.nan).load()
+    sfc_flux_lw = xr.full_like(ds.skt, np.nan).load()
+    htr_lw = xr.full_like(ds.t.transpose(*sample_dims, "level"), np.nan).load()
     failed_cases = []
-    for i in range(N):
-        for j in range(M):
-            lat, lon = ds_sfc.latitude[i], ds_sfc.longitude[j]
-            clouds = 0
-            isel_arg = {"latitude": i, "longitude": j}
-            pave, tave, p0, t0, p1, t1, wkl, wbroadl = prepare_era5_profile(
-                ds_atm.isel(isel_arg),
-                sp=ds_sfc.isel(isel_arg).sp.item(),
-                skt=ds_sfc.isel(isel_arg).skt.item(),
-            )
-            input_builder = RRTMG_LW_INPUT(
-                cxid=f"lat={lat}, lon={lon}, t=2020",
-                iaer=0,
-                iatm=0,
-                ixsect=0,
-                numangs=0,
-                iout=99,
-                idrv=0,
-                imca=clouds,
-                icld=clouds,
-                tbound=-1,  # sfc temp set of temp at bottom of first layer
-                iemis=0,  # each band has emissivity equal to 1.0
-                ireflect=0,  # only choice for RRTMG_LW
-                semiss=None,
-                dtbound=None,  # only if idrv = 1
-            )
-            input_builder.set_fields_rrtatm0(
-                iform=0,
-                nlayrs=len(pave),
-                ixmols=7,
-                nmol=7,
-                pave=pave,
-                tave=tave,
-                pz0=p0,
-                pz1=p1,
-                tz0=t0,
-                tz1=t1,
-                wkl=wkl,
-                wbroadl=wbroadl,
-            )
+    for index in np.ndindex(*(ds.sizes[dim] for dim in sample_dims)):
+        isel_arg = dict(zip(sample_dims, index))
+        profile = ds.isel(isel_arg)
+        clouds = 0
+        pave, tave, p0, t0, p1, t1, wkl, wbroadl = prepare_era5_profile(
+            profile, profile.sp.item()
+        )
+        input_builder = RRTMG_LW_INPUT(
+            cxid="rrtmg input",
+            iaer=0,
+            iatm=0,
+            ixsect=0,
+            numangs=0,
+            iout=99,
+            idrv=0,
+            imca=clouds,
+            icld=clouds,
+            tbound=profile.skt.item(),  # sfc temp set of temp at bottom of first layer
+            iemis=0,  # each band has emissivity equal to 1.0
+            ireflect=0,  # only choice for RRTMG_LW
+            semiss=None,
+            dtbound=None,  # only if idrv = 1
+        )
+        input_builder.set_fields_rrtatm0(
+            iform=0,
+            nlayrs=len(pave),
+            ixmols=7,
+            nmol=7,
+            pave=pave,
+            tave=tave,
+            pz0=p0,
+            pz1=p1,
+            tz0=t0,
+            tz1=t1,
+            wkl=wkl,
+            wbroadl=wbroadl,
+        )
 
-            with open(tmpdir / "INPUT_RRTM", "wt") as input_file:
-                input_builder.write(input_file)
+        with open(tmpdir / "INPUT_RRTM", "wt") as input_file:
+            input_builder.write(input_file)
 
-            try:
-                subprocess.run("rrtmg_lw", cwd=tmpdir, check=True)
-            except subprocess.CalledProcessError as e:
-                print(f"Command failed with exit code: {e.returncode}")
-                print(f"Error message: {e.stderr}")
-                failed_cases.append((i, j))
-            # example output:
+        try:
+            subprocess.run("rrtmg_lw", cwd=tmpdir, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Command failed with exit code: {e.returncode}")
+            print(f"Error message: {e.stderr}")
+            failed_cases.append(index)
+            continue
 
-            # Wavenumbers:   10.0 - 3250.0 cm-1, ATM      1
-            # LEVEL    PRESSURE   UPWARD FLUX   DOWNWARD FLUX    NET FLUX       HEATING RATE
-            #             mb          W/m2          W/m2           W/m2          degree/day
-            #  35        0.5000     220.0961        0.0000       220.0960511            0.00000
-            #  34        1.500      219.8816        3.7730       216.1086904          -33.64992
-            #  ...
-            #   0      964.6        289.8190      144.6184       145.2006054           -0.69800
-            #  ...
-            with open(tmpdir / "OUTPUT_RRTM", "rt") as output_file:
-                data = np.loadtxt(
-                    output_file, skiprows=3, max_rows=len(pave), usecols=[4, 5]
-                )
-                toa_flux_lw[i, j] = data[0, -1]
-                sfc_flux_lw[i, j] = data[0, 0]
-                htr_lw[i, j] = data[1]
+        # Output has one boundary row followed by one row per layer.
+        with open(tmpdir / "OUTPUT_RRTM", "rt") as output_file:
+            data = np.loadtxt(
+                output_file, skiprows=3, max_rows=len(pave) + 1, usecols=[4, 5]
+            )
+            toa_flux_lw.values[index] = data[0, 0]
+            sfc_flux_lw.values[index] = data[-1, 0]
+            htr_lw.values[index + (slice(0, len(pave)),)] = data[1:, 1]
 
     failed_cases_np = np.array(failed_cases)
 
