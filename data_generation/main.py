@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 from rrtmg_lw_input import RRTMG_LW_INPUT
+from rrtmg_output import read_rrtmg_output
 from rrtmg_util import prepare_era5_profile
 from tap import Tap
 
@@ -46,8 +47,10 @@ def main():
     tmpdir = args.output_dir / "_tmp"
     tmpdir.mkdir(exist_ok=True)
     sample_dims = ds.skt.dims
-    toa_flux_lw = xr.full_like(ds.skt, np.nan).load()
-    sfc_flux_lw = xr.full_like(ds.skt, np.nan).load()
+    nband = 16
+    toa_flux_lw = xr.full_like(
+        ds.skt.expand_dims(band=np.arange(1, nband + 1), axis=-1), np.nan
+    ).load()
     htr_lw = xr.full_like(ds.t.transpose(*sample_dims, "level"), np.nan).load()
     failed_cases = []
     for index in np.ndindex(*(ds.sizes[dim] for dim in sample_dims)):
@@ -101,17 +104,15 @@ def main():
 
         # Output has one boundary row followed by one row per layer.
         with open(tmpdir / "OUTPUT_RRTM", "rt") as output_file:
-            data = np.loadtxt(
-                output_file, skiprows=3, max_rows=len(pave) + 1, usecols=[4, 5]
+            toa_lw, profile_htr_lw = read_rrtmg_output(
+                output_file, nlev=len(pave), nband=nband
             )
-            toa_flux_lw.values[index] = data[0, 0]
-            sfc_flux_lw.values[index] = data[-1, 0]
-            htr_lw.values[index + (slice(0, len(pave)),)] = data[1:, 1]
+            toa_flux_lw.values[index] = toa_lw
+            htr_lw.values[index + (slice(0, len(pave)),)] = profile_htr_lw
 
     failed_cases_np = np.array(failed_cases)
 
     toa_flux_lw.to_netcdf(args.output_dir / "toa_flux_lw.nc")
-    sfc_flux_lw.to_netcdf(args.output_dir / "sfc_flux_lw.nc")
     htr_lw.to_netcdf(args.output_dir / "htr_lw.nc")
     np.savetxt(args.output_dir / "failed_cases.nc", failed_cases_np)
 

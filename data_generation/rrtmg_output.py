@@ -10,7 +10,8 @@ def read_rrtmg_output(f: TextIOBase, nlev, nband):
     lines = f.readlines()
 
     i = 0
-    i += 3
+    i += 3 # header
+    i += 1 # heating rate not defined at top boundary
     for lev in range(nlev):
         _, _, _, _, _, htr = lines[i].split()
         htr_lw[lev] = htr
@@ -22,7 +23,7 @@ def read_rrtmg_output(f: TextIOBase, nlev, nband):
         print(lines[i])
         _, _, f_up_toa, _, _, _ = lines[i].split()
         toa_lw[band] = f_up_toa
-        i += nlev
+        i += (nlev + 1)
         i += 1
 
     return toa_lw, htr_lw
