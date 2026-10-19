@@ -1,32 +1,35 @@
+import calendar
 from pathlib import Path
 
 import cdsapi
 
-ERA5_SINGLE_LEVELS_VARIABLES = [
-    "2m_temperature",
-    "skin_temperature",
-    "forecast_albedo",
-    "surface_pressure",
-    "toa_incident_solar_radiation",
-    "top_net_solar_radiation",
-    "top_net_solar_radiation_clear_sky",
-    "top_net_thermal_radiation",
-    "top_net_thermal_radiation_clear_sky",
-]
+# fmt: off
+single_level_vars = {
+    "t2m" : "2m_temperature",
+    "skt" : "skin_temperature",
+    "fal" : "forecast_albedo",
+    "sp"  : "surface_pressure",
+    "tisr": "toa_incident_solar_radiation",
+    "tsr" : "top_net_solar_radiation",
+    "tsrc": "top_net_solar_radiation_clear_sky",
+    "ttr" : "top_net_thermal_radiation",
+    "ttrc": "top_net_thermal_radiation_clear_sky",
+}
 
-ERA5_PRESSURE_LEVELS_VARIABLES = [
-    "ozone_mass_mixing_ratio",
-    "specific_humidity",
-    "temperature",
+pressure_level_vars = {
+    "o3": "ozone_mass_mixing_ratio",
+    "q" : "specific_humidity",
+    "t" : "temperature"
     # 'fraction_of_cloud_cover',
     # 'geopotential',
     # 'specific_cloud_ice_water_content',
     # 'specific_cloud_liquid',
     # 'specific_rain_water_content',
     # 'specific_snow_water_content'
-]
+}
 
-MONTHS = ["01"]  # [f"{m:02d}" for m in range(1, 13)]
+
+
 # fmt: off
 ALL_PRESSURE_LEVELS = [
   "1",   "2",   "3",   "5",   "7",   "10",
@@ -37,10 +40,15 @@ ALL_PRESSURE_LEVELS = [
   "850", "875", "900", "925", "950", "975",
   "1000",
 ]
-
+ALL_TIMES = ["00:00", "06:00", "12:00", "18:00"]
 # fmt: on
 
-DATA_PATH_ERA5 = Path("data/era5")
+
+def all_days(year, month):
+    _, n_days = calendar.monthrange(year, month)
+    days = [f"{d + 1:02d}" for d in range(n_days)]
+    return days
+
 
 c = cdsapi.Client(
     url="https://cds.climate.copernicus.eu/api",
@@ -48,54 +56,64 @@ c = cdsapi.Client(
 )
 
 
-def retrieve_era5_years_data(years: list[int], data_path: Path = DATA_PATH_ERA5):
-    data_path.mkdir(parents=True, exist_ok=True)
-
-    for year in years:
-        path = data_path / f"era5_single_levels_monthly_{year}.grib"
-        if path.exists():
-            print(f"found existing data for year {year}, skipping")
-            continue
-
-        _ = c.retrieve(
-            "reanalysis-era5-single-levels-monthly-means",
-            {
-                "product_type": "monthly_averaged_reanalysis",
-                "variable": ERA5_SINGLE_LEVELS_VARIABLES,
-                "year": year,
-                "month": MONTHS,
-                "time": "00:00",
-            },
-            str(path),
-        )
+def era5_request_plev(year: str, month: str, var: str, out: Path):
+    c.retrieve(
+        "reanalysis-era5-pressure-levels",
+        {
+            "product_type": "reanalysis",
+            "pressure_level": ALL_PRESSURE_LEVELS,
+            "variable": [pressure_level_vars[var]],
+            "year": year,
+            "month": month,
+            "day": all_days(year, month),
+            "time": ALL_TIMES,
+            "format": "netcdf",
+            "grid": "1.0/1.0",
+        },
+        str(out),
+    )
 
 
-def retrieve_era5_plevl(years: list[int], data_path: Path = DATA_PATH_ERA5):
-    data_path.mkdir(parents=True, exist_ok=True)
-
-    for year in years:
-        path = data_path / f"era5_plev_qt_monthly_{year}.grib"
-        if path.exists():
-            print(f"found existing data for year {year}, skipping")
-            continue
-
-        _ = c.retrieve(
-            "reanalysis-era5-pressure-levels-monthly-means",
-            {
-                "product_type": "monthly_averaged_reanalysis",
-                "pressure_level": ALL_PRESSURE_LEVELS,
-                "variable": ERA5_PRESSURE_LEVELS_VARIABLES,
-                "year": year,
-                "month": MONTHS,
-                "time": "00:00",
-                "data_format": "grib",
-                "download_format": "unarchived",
-            },
-            str(path),
-        )
+def era5_request_slev(year: str, month: str, var: str, out: Path):
+    c.retrieve(
+        "reanalysis-era5-single-levels",
+        {
+            "product_type": "reanalysis",
+            "variable": [single_level_vars[var]],
+            "year": year,
+            "month": month,
+            "day": all_days(year, month),
+            "time": ALL_TIMES,
+            "format": "netcdf",
+            "grid": "1.0/1.0",
+        },
+        str(out),
+    )
 
 
 if __name__ == "__main__":
-    years = [2020]
-    retrieve_era5_years_data(years)
-    retrieve_era5_plevl(years)
+    base_path = Path("data/era5_6hr_1.0")
+    years = ["2011", "2012", "2013", "2014", "2015"]
+    months = [f"{m:02d}" for m in range(1, 13)]
+
+    for var in single_level_vars:
+        (base_path / var).mkdir(parents=True, exist_ok=True)
+        for year in years:
+            for month in months:
+                out_path = base_path / var / f"{year}-{month}.nc"
+                if out_path.exists():
+                    print(f"{var}/{year}-{month} already exists, skipping")
+                    continue
+
+                era5_request_slev(year, month, var, out_path)
+
+    for var in pressure_level_vars:
+        (base_path / var).mkdir(parents=True, exist_ok=True)
+        for year in years:
+            for month in months:
+                out_path = base_path / var / f"{year}-{month}.nc"
+                if out_path.exists():
+                    print(f"{var}/{year}-{month} already exists, skipping")
+                    continue
+
+                era5_request_plev(year, month, var, out_path)
