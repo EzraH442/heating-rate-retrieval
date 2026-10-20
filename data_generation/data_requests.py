@@ -56,7 +56,7 @@ c = cdsapi.Client(
 )
 
 
-def era5_request_plev(year: str, month: str, var: str, out: Path):
+def era5_request_plev(year: str, month: str, var: str, grid: str, out: Path):
     c.retrieve(
         "reanalysis-era5-pressure-levels",
         {
@@ -68,13 +68,13 @@ def era5_request_plev(year: str, month: str, var: str, out: Path):
             "day": all_days(year, month),
             "time": ALL_TIMES,
             "format": "netcdf",
-            "grid": "1.0/1.0",
+            "grid": grid,
         },
         str(out),
     )
 
 
-def era5_request_slev(year: str, month: str, var: str, out: Path):
+def era5_request_slev(year: str, month: str, var: str, grid: str, out: Path):
     c.retrieve(
         "reanalysis-era5-single-levels",
         {
@@ -85,16 +85,17 @@ def era5_request_slev(year: str, month: str, var: str, out: Path):
             "day": all_days(year, month),
             "time": ALL_TIMES,
             "format": "netcdf",
-            "grid": "1.0/1.0",
+            "grid": grid,
         },
         str(out),
     )
 
 
 if __name__ == "__main__":
-    base_path = Path("data/era5_6hr_1.0")
+    base_path = Path("data/era5_6hr_2.5")
     years = ["2011", "2012", "2013", "2014", "2015"]
     months = [f"{m:02d}" for m in range(1, 13)]
+    grid = '2.5/2.5'
 
     for var in single_level_vars:
         (base_path / var).mkdir(parents=True, exist_ok=True)
@@ -105,7 +106,7 @@ if __name__ == "__main__":
                     print(f"{var}/{year}-{month} already exists, skipping")
                     continue
 
-                era5_request_slev(year, month, var, out_path)
+                era5_request_slev(year, month, var, grid, out_path)
 
     for var in pressure_level_vars:
         (base_path / var).mkdir(parents=True, exist_ok=True)
@@ -116,4 +117,4 @@ if __name__ == "__main__":
                     print(f"{var}/{year}-{month} already exists, skipping")
                     continue
 
-                era5_request_plev(year, month, var, out_path)
+                era5_request_plev(year, month, var, grid, out_path)
