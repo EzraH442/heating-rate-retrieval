@@ -7,6 +7,7 @@ from rrtmg_lw_input import RRTMG_LW_INPUT
 from rrtmg_output import read_rrtmg_output
 from rrtmg_util import prepare_era5_profile
 from tap import Tap
+from tqdm import tqdm
 
 
 class Parser(Tap):
@@ -53,7 +54,7 @@ def main():
     ).load()
     htr_lw = xr.full_like(ds.t.transpose(*sample_dims, "level"), np.nan).load()
     failed_cases = []
-    for index in np.ndindex(*(ds.sizes[dim] for dim in sample_dims)):
+    for index in tqdm(np.ndindex(*(ds.sizes[dim] for dim in sample_dims))):
         isel_arg = dict(zip(sample_dims, index))
         profile = ds.isel(isel_arg)
         clouds = 0
