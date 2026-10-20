@@ -26,6 +26,7 @@ class TransformerModel(nn.Module):
         self.num_bands = num_bands
 
         self.flux_embed = nn.Embedding(num_bands, d_model)
+        self.flux_value = nn.Linear(1, d_model)
         self.level_embed = nn.Embedding(num_levels, d_model)
 
         self.cross_attn = nn.MultiheadAttention(d_model, n_heads, batch_first=True)
@@ -52,7 +53,9 @@ class TransformerModel(nn.Module):
         # flux embedding, each band is a "token"
         # (16) -> (16, d_model) -> (B, 16, d_model)
         flux_ids = torch.arange(self.num_bands, device=device)
-        kv = self.flux_embed(flux_ids).unsqueeze(0).expand(B, -1, -1)
+        kv = self.flux_embed(flux_ids).unsqueeze(0) + self.flux_value(
+            fluxes.unsqueeze(-1)
+        )
 
         # pressure levels as query vectors
         # (37) -> (37, d_model) -> (B, 37, d_model)
@@ -60,7 +63,7 @@ class TransformerModel(nn.Module):
         q = self.level_embed(level_ids).unsqueeze(0).expand(B, -1, -1)
 
         # x-attn flux profile with pressure level embeddings
-        attn_out = self.cross_attn(query=q, key=kv, value=kv)
+        attn_out, _ = self.cross_attn(query=q, key=kv, value=kv, need_weights=False)
         x = self.norm_cross(q + attn_out)
 
         # self-attn over pressure levels
