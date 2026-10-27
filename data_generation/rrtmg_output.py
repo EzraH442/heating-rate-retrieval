@@ -20,7 +20,6 @@ def read_rrtmg_output(f: TextIOBase, nlev, nband):
 
     for band in range(nband):
         i += 3
-        print(lines[i])
         _, _, f_up_toa, _, _, _ = lines[i].split()
         toa_lw[band] = f_up_toa
         i += (nlev + 1)
