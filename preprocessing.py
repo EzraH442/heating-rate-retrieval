@@ -70,6 +70,7 @@ def create_output(
         "htr_lw",
         "f4",
         ("time", "level", "latitude", "longitude"),
+        fill_value=np.nan,
         zlib=True,
         complevel=4,
     )
@@ -157,5 +158,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
