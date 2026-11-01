@@ -14,8 +14,9 @@ from tqdm import tqdm
 class Parser(Tap):
     year: int
     month: int
+    time_index: int | None = None
     input_dir: Path = Path("data/era5_6hr_1.0")
-    output_dir = Path("data/rrtmg")
+    output_dir: Path = Path("data/rrtmg")
     upper_profile_path: Path = Path("data_qtqo3_123lvl.nc")
 
     def process_args(self):
@@ -69,6 +70,12 @@ def create_output(path, name, ds, sample_dims, output_dim, output_coords):
 def main():
     args = Parser().parse_args()
     ds = open_era5(args.input_dir, args.year, args.month)
+    if args.time_index is not None:
+        if not 0 <= args.time_index < ds.sizes["time"]:
+            raise IndexError(
+                f"time_index {args.time_index} is outside 0..{ds.sizes['time'] - 1}"
+            )
+        ds = ds.isel(time=slice(args.time_index, args.time_index + 1))
     upper_p, upper_t, upper_q, upper_o3, interface_p, interface_t = (
         load_upper_profile(args.upper_profile_path)
     )
