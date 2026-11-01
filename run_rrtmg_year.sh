@@ -1,9 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=rrtmg
+#SBATCH --account=rrg-yihuang-ad
 # 365 days x 4 six-hourly timestamps per day = 1,460 tasks.
 #SBATCH --array=0-1459
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=1G
+#SBATCH --mem-per-cpu=1G
+#SBATCH --ntasks=1
 #SBATCH --time=04:00:00
 #SBATCH --output=slurm-%x-%A_%a.out
 
