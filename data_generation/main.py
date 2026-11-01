@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import xarray as xr
+from netCDF4 import Dataset
 from rrtmg_lw_input import RRTMG_LW_INPUT, load_upper_profile, patch_upper_layers
 from rrtmg_output import read_rrtmg_output
 from rrtmg_util import broad, prepare_era5_profile
@@ -42,6 +43,29 @@ def open_era5(input_dir: Path, year: int, month: int) -> xr.Dataset:
     )
 
 
+def create_output(path, name, ds, sample_dims, output_dim, output_coords):
+    output = Dataset(path, "w", format="NETCDF4")
+    dimensions = (*sample_dims, output_dim)
+    for dim in dimensions:
+        values = output_coords if dim == output_dim else ds[dim].values
+        output.createDimension(dim, len(values))
+        if np.issubdtype(values.dtype, np.datetime64):
+            coordinate = output.createVariable(dim, "i8", (dim,))
+            coordinate.units = "seconds since 1970-01-01 00:00:00"
+            coordinate.calendar = "proleptic_gregorian"
+            coordinate[:] = values.astype("datetime64[s]").astype(np.int64)
+        else:
+            coordinate = output.createVariable(dim, values.dtype, (dim,))
+            coordinate[:] = values
+        if dim in ds.coords:
+            coordinate.setncatts(ds[dim].attrs)
+
+    variable = output.createVariable(
+        name, "f4", dimensions, fill_value=np.nan, zlib=True
+    )
+    return output, variable
+
+
 def main():
     args = Parser().parse_args()
     ds = open_era5(args.input_dir, args.year, args.month)
@@ -53,15 +77,28 @@ def main():
     tmpdir.mkdir(exist_ok=True)
     sample_dims = ds.skt.dims
     nband = 16
-    toa_flux_lw = xr.full_like(
-        ds.skt.expand_dims(band=np.arange(1, nband + 1), axis=-1), np.nan
-    ).load()
     levels = np.concatenate((ds.level, upper_p))
-    htr_lw = xr.full_like(
-        ds.t.transpose(*sample_dims, "level").reindex(level=levels), np.nan
-    ).load()
+    toa_output, toa_flux_lw = create_output(
+        args.output_dir / "toa_flux_lw.nc",
+        "toa_flux_lw",
+        ds,
+        sample_dims,
+        "band",
+        np.arange(1, nband + 1),
+    )
+    htr_output, htr_lw = create_output(
+        args.output_dir / "htr_lw.nc",
+        "htr_lw",
+        ds,
+        sample_dims,
+        "level",
+        levels,
+    )
     failed_cases = []
-    for index in tqdm(np.ndindex(*(ds.sizes[dim] for dim in sample_dims))):
+    sample_shape = tuple(ds.sizes[dim] for dim in sample_dims)
+
+    # ~1.5 iterations per second on 1 cpu with 500M memory on rorqual
+    for index in tqdm(np.ndindex(*sample_shape), total=np.prod(sample_shape)):
         isel_arg = dict(zip(sample_dims, index))
         profile = ds.isel(isel_arg)
         clouds = 0
@@ -129,13 +166,13 @@ def main():
             toa_lw, profile_htr_lw = read_rrtmg_output(
                 output_file, nlev=len(pave), nband=nband
             )
-            toa_flux_lw.values[index] = toa_lw
-            htr_lw.values[index + (slice(0, len(pave)),)] = profile_htr_lw
+            toa_flux_lw[index + (slice(None),)] = toa_lw
+            htr_lw[index + (slice(0, len(pave)),)] = profile_htr_lw
 
     failed_cases_np = np.array(failed_cases)
 
-    toa_flux_lw.to_netcdf(args.output_dir / "toa_flux_lw.nc")
-    htr_lw.to_netcdf(args.output_dir / "htr_lw.nc")
+    toa_output.close()
+    htr_output.close()
     np.savetxt(args.output_dir / "failed_cases.nc", failed_cases_np)
 
 
