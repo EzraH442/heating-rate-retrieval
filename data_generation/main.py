@@ -3,9 +3,9 @@ from pathlib import Path
 
 import numpy as np
 import xarray as xr
-from rrtmg_lw_input import RRTMG_LW_INPUT
+from rrtmg_lw_input import RRTMG_LW_INPUT, load_upper_profile, patch_upper_layers
 from rrtmg_output import read_rrtmg_output
-from rrtmg_util import prepare_era5_profile
+from rrtmg_util import broad, prepare_era5_profile
 from tap import Tap
 from tqdm import tqdm
 
@@ -15,6 +15,7 @@ class Parser(Tap):
     month: int
     input_dir: Path = Path("data/era5_6hr_1.0")
     output_dir = Path("data/rrtmg")
+    upper_profile_path: Path = Path("data_qtqo3_123lvl.nc")
 
     def process_args(self):
         self.output_dir.mkdir(exist_ok=True, parents=True)
@@ -44,6 +45,9 @@ def open_era5(input_dir: Path, year: int, month: int) -> xr.Dataset:
 def main():
     args = Parser().parse_args()
     ds = open_era5(args.input_dir, args.year, args.month)
+    upper_p, upper_t, upper_q, upper_o3, interface_p, interface_t = (
+        load_upper_profile(args.upper_profile_path)
+    )
 
     tmpdir = args.output_dir / "_tmp"
     tmpdir.mkdir(exist_ok=True)
@@ -52,15 +56,32 @@ def main():
     toa_flux_lw = xr.full_like(
         ds.skt.expand_dims(band=np.arange(1, nband + 1), axis=-1), np.nan
     ).load()
-    htr_lw = xr.full_like(ds.t.transpose(*sample_dims, "level"), np.nan).load()
+    levels = np.concatenate((ds.level, upper_p))
+    htr_lw = xr.full_like(
+        ds.t.transpose(*sample_dims, "level").reindex(level=levels), np.nan
+    ).load()
     failed_cases = []
     for index in tqdm(np.ndindex(*(ds.sizes[dim] for dim in sample_dims))):
         isel_arg = dict(zip(sample_dims, index))
         profile = ds.isel(isel_arg)
         clouds = 0
-        pave, tave, p0, t0, p1, t1, wkl, wbroadl = prepare_era5_profile(
+        pave, tave, p0, t0, p1, t1, wkl = prepare_era5_profile(
             profile, profile.sp.item()
         )
+        pave, tave, p1, t1, wkl = patch_upper_layers(
+            pave,
+            tave,
+            p1,
+            t1,
+            wkl,
+            upper_p,
+            upper_t,
+            upper_q,
+            upper_o3,
+            interface_p,
+            interface_t,
+        )
+        wbroadl = broad(np.r_[p0, p1], wkl)
         input_builder = RRTMG_LW_INPUT(
             cxid="rrtmg input",
             iaer=0,

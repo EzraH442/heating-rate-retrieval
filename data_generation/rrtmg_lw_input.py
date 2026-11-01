@@ -1,6 +1,53 @@
+from pathlib import Path
 from typing import Literal, TextIO
 
 import numpy as np
+import xarray as xr
+
+
+def load_upper_profile(path: Path):
+    profile = xr.load_dataset(path).data.values
+    pressure, temperature, q, o3 = profile
+    interface_indices = [0, 9, 18, 27, 36, 45]
+    average_indices = [4, 13, 22, 31, 40]
+    upper_q = q[average_indices]
+    return (
+        pressure[average_indices],
+        temperature[average_indices],
+        upper_q / (1 - upper_q) / 0.622,
+        o3[average_indices] * 28.9647 / 47.9982,
+        pressure[interface_indices],
+        temperature[interface_indices],
+    )
+
+
+def patch_upper_layers(
+    pave,
+    tave,
+    pz1,
+    tz1,
+    wkl,
+    upper_p,
+    upper_t,
+    upper_q,
+    upper_o3,
+    interface_p,
+    interface_t,
+):
+    if not np.all(np.diff(pave) < 0):
+        raise ValueError("ERA5 pressure levels must run from the surface upward")
+
+    pave = np.concatenate((pave, upper_p))
+    tave = np.concatenate((tave, upper_t))
+    pz1[-1] = interface_p[0]
+    tz1[-1] = interface_t[0]
+    pz1 = np.concatenate((pz1, interface_p[1:]))
+    tz1 = np.concatenate((tz1, interface_t[1:]))
+    upper_wkl = np.repeat(wkl[:, -1:], len(upper_p), axis=1)
+    upper_wkl[0] = upper_q
+    upper_wkl[2] = upper_o3
+    wkl = np.concatenate((wkl, upper_wkl), axis=1)
+    return pave, tave, pz1, tz1, wkl
 
 
 class RRTMG_LW_INPUT:
