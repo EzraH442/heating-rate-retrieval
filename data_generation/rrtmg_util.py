@@ -99,13 +99,10 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp):
     wkl = np.zeros((7, n_lev))
     wkl[0] = vmr(plev_ds["q"].to_numpy()[mask])
     wkl[1] = 330e-6  # co2 vmr
-    wkl[2] = plev_ds["o3"].to_numpy()[mask]
+    wkl[2] = plev_ds["o3"].to_numpy()[mask] * 28.9647 / 47.9982
     wkl[3] = 3.16e-07  # n20 vmr
     wkl[4] = 1.5e-7  # CO vmr
     wkl[5] = 1.8 * 1e-6  # ch4 vmr
     wkl[6] = 0.209  # O2 cmr 20.9%
 
-    # broadening calculation
-    wbroadl = broad(pint, wkl)
-
-    return pave, tave, pz0, tz0, p1, t1, wkl, wbroadl
+    return pave, tave, pz0, tz0, p1, t1, wkl
