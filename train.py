@@ -20,6 +20,8 @@ class Parser(Tap):
     learning_rate: float = 1e-3
     workers: int = 0
     seed: int = 0
+    train_year: int = 2013
+    test_year: int = 2014
     hidden_layers: list[int] = [128, 128]
     checkpoint_dir: Path = Path("checkpoints")
     resume: Path | None = None
@@ -43,11 +45,22 @@ class RRTMGDataset(Dataset):
         return self.fluxes[index], self.heating_rates[index]
 
 
-def load_data(data_dir: Path):
-    def load(split):
+def load_data(data_dir: Path, train_year: int, test_year: int):
+    if train_year == test_year:
+        raise ValueError("Training and testing years must differ")
+
+    def load(year):
         fluxes = []
         heating_rates = []
-        for path in sorted(data_dir.glob(f"{split}_*.nc")):
+        year_path = data_dir / f"data_{year}.nc"
+        paths = (
+            [year_path]
+            if year_path.exists()
+            else sorted(data_dir.glob(f"*_{year}.nc"))
+        )
+        if not paths:
+            raise FileNotFoundError(f"No preprocessed data found for {year} in {data_dir}")
+        for path in paths:
             with xr.open_dataset(path) as dataset:
                 x = dataset.toa_flux_lw.transpose(
                     "time", "latitude", "longitude", "band"
@@ -59,8 +72,8 @@ def load_data(data_dir: Path):
                 heating_rates.append(y.astype(np.float32))
         return np.concatenate(fluxes), np.concatenate(heating_rates)
 
-    train_fluxes, train_htr = load("train")
-    test_fluxes, test_htr = load("test")
+    train_fluxes, train_htr = load(train_year)
+    test_fluxes, test_htr = load(test_year)
     return train_fluxes, train_htr, test_fluxes, test_htr
 
 
@@ -92,7 +105,9 @@ def main():
     experiment.log_parameters(args.as_dict())
 
     torch.manual_seed(args.seed)
-    train_fluxes, train_htr, test_fluxes, test_htr = load_data(args.data_dir)
+    train_fluxes, train_htr, test_fluxes, test_htr = load_data(
+        args.data_dir, args.train_year, args.test_year
+    )
     if not len(train_fluxes):
         raise ValueError("No training profiles found")
     # Axis 0 is the flattened (time, latitude, longitude) sample dimension.

@@ -2,6 +2,7 @@
 #SBATCH --job-name=rrtmg
 #SBATCH --account=rrg-yihuang-ad
 # 365 days x 4 six-hourly timestamps per day = 1,460 tasks.
+# need to override the array with 0-1463 when computing values for a leap year
 #SBATCH --array=0-1459
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=1G

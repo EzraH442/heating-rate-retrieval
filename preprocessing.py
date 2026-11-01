@@ -9,8 +9,6 @@ from tap import Tap
 class Parser(Tap):
     data_dir: Path
     output_dir: Path
-    test_fraction: float = 0.2
-    seed: int = 0
 
 
 def input_files(data_dir: Path) -> dict[int, list[tuple[int, Path, Path]]]:
@@ -43,9 +41,7 @@ def input_files(data_dir: Path) -> dict[int, list[tuple[int, Path, Path]]]:
     return years
 
 
-def create_output(
-    path: Path, split: str, year: int, band, level, latitude, longitude, test_fraction, seed
-):
+def create_output(path: Path, year: int, band, level, latitude, longitude):
     output = Dataset(path, "w", format="NETCDF4")
     output.createDimension("time", None)
     output.createDimension("latitude", len(latitude))
@@ -74,13 +70,11 @@ def create_output(
         zlib=True,
         complevel=4,
     )
-    output.setncatts(
-        {"year": year, "split": split, "test_fraction": test_fraction, "seed": seed}
-    )
+    output.setncattr("year", year)
     return output
 
 
-def preprocess_year(year, pairs, output_dir, test_fraction, seed):
+def preprocess_year(year, pairs, output_dir):
     _, first_flux, first_htr = pairs[0]
     with Dataset(first_flux) as flux_ds, Dataset(first_htr) as htr_ds:
         band = flux_ds.variables["band"][:]
@@ -88,30 +82,15 @@ def preprocess_year(year, pairs, output_dir, test_fraction, seed):
         latitude = flux_ds.variables["latitude"][:]
         longitude = flux_ds.variables["longitude"][:]
 
-    outputs = {
-        split: create_output(
-            output_dir / f"{split}_{year}.nc",
-            split,
-            year,
-            band,
-            level,
-            latitude,
-            longitude,
-            test_fraction,
-            seed,
-        )
-        for split in ("train", "test")
-    }
-    positions = {"train": 0, "test": 0}
-    rng = np.random.default_rng(seed + year)
-    total_times = 0
-    for _, flux_path, _ in pairs:
-        with Dataset(flux_path) as flux_ds:
-            total_times += len(flux_ds.dimensions["time"])
-    test_times = set(
-        rng.choice(total_times, int(total_times * test_fraction), replace=False)
+    output = create_output(
+        output_dir / f"data_{year}.nc",
+        year,
+        band,
+        level,
+        latitude,
+        longitude,
     )
-    year_time_index = 0
+    position = 0
 
     try:
         for month, flux_path, htr_path in pairs:
@@ -121,9 +100,6 @@ def preprocess_year(year, pairs, output_dir, test_fraction, seed):
 
                 for time_index in range(flux.shape[0]):
                     # up_down_net=1 is the upward TOA flux; index 0 in these files.
-                    split = "test" if year_time_index in test_times else "train"
-                    position = positions[split]
-                    output = outputs[split]
                     file_time = flux_ds.variables["time"][time_index]
                     date = datetime(year, month, 1) + timedelta(
                         hours=(float(file_time) - 1) * 6
@@ -132,13 +108,11 @@ def preprocess_year(year, pairs, output_dir, test_fraction, seed):
                     time[position] = date2num(date, time.units, time.calendar)
                     output.variables["toa_flux_lw"][position] = flux[time_index, :, :, 0, :]
                     output.variables["htr_lw"][position] = htr[time_index]
-                    positions[split] += 1
-                    year_time_index += 1
+                    position += 1
     finally:
-        for output in outputs.values():
-            output.close()
+        output.close()
 
-    print(f"{year}: {positions['train']} training, {positions['test']} testing times")
+    print(f"{year}: {position} times")
 
 
 def main():
@@ -147,15 +121,8 @@ def main():
 
     files_by_year = input_files(args.data_dir)
     for year, pairs in sorted(files_by_year.items()):
-        preprocess_year(
-            year,
-            pairs,
-            args.output_dir,
-            args.test_fraction,
-            args.seed,
-        )
+        preprocess_year(year, pairs, args.output_dir)
 
 
 if __name__ == "__main__":
     main()
-
