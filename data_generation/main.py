@@ -32,15 +32,19 @@ def open_era5(input_dir: Path, year: int, month: int) -> xr.Dataset:
         datasets.append(xr.open_dataset(path))
 
     ds = xr.merge(datasets)
-
-    # switch valid_time to time
-    for data_var in ds.data_vars:
-        if "valid_time" in ds[data_var].coords:
-            ds[data_var] = ds[data_var].swap_dims({"valid_time": "time"})
-
-    # remove the leftover valid_time coordinate (and expver if it's still attached to it)
-    ds = ds.drop_vars(["valid_time", "expver"])
-    return ds
+    ds = ds.rename(
+        {
+            source: destination
+            for source, destination in {
+                "valid_time": "time",
+                "pressure_level": "level",
+            }.items()
+            if source in ds.dims
+        }
+    )
+    if "expver" in ds:
+        ds = ds.drop_vars("expver")
+    return ds.sortby("level", ascending=False)
 
 
 def create_output(path, name, ds, sample_dims, output_dim, output_coords):
