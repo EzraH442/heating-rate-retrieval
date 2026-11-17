@@ -244,7 +244,7 @@ class RRTMG_LW_INPUT:
         shape: (L)
 
         # `wkl`
-        column densities or mixing ratios for 7 molecular species (molecules/cm**2)
+        column amounts for 7 molecular species (molecules/cm**2)
 
         shape (M, L)
         M - molecule

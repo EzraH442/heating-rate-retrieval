@@ -8,7 +8,7 @@ g   = 9.81     # N/kg gravitational constant
 # fmt: on
 
 
-def broad(p: np.ndarray, wkl: np.ndarray):
+def column_amounts(p: np.ndarray, vmr: np.ndarray):
     """
     # Parameters
 
@@ -19,23 +19,23 @@ def broad(p: np.ndarray, wkl: np.ndarray):
     Pressure at interfaces
           shape: (L+1)
 
-    ## `wkl`
+    ## `vmr`
 
     Volume mixing ratio concentrations per absorber (k) per layer (l)
     Assumed that water vapour vmr is at first index.
 
            shape: (K, L)
     """
-    h2ovmr = wkl[0]
+    h2ovmr = vmr[0]
 
     # molecular weight of moist air (g/mol)
     amm = (1 - h2ovmr) * 28.966 + h2ovmr * 18.016
 
     dp = p[:-1] - p[1:]
     dry_air = dp * 1e3 * N_A / (1e2 * (g * amm * (1 + h2ovmr)))
-    summol = wkl.sum(axis=0)
-    wbroadl = dry_air * (1 - summol)
-    return wbroadl
+    wkl = vmr * dry_air
+    wbroadl = dry_air * (1 - vmr.sum(axis=0))
+    return wkl, wbroadl
 
 
 def vmr(q):

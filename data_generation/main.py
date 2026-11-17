@@ -6,7 +6,7 @@ import xarray as xr
 from netCDF4 import Dataset
 from rrtmg_lw_input import RRTMG_LW_INPUT, load_upper_profile, patch_upper_layers
 from rrtmg_output import read_rrtmg_output
-from rrtmg_util import broad, prepare_era5_profile
+from rrtmg_util import column_amounts, prepare_era5_profile
 from tap import Tap
 from tqdm import tqdm
 
@@ -124,7 +124,7 @@ def main():
             interface_p,
             interface_t,
         )
-        wbroadl = broad(np.r_[p0, p1], wkl)
+        wkl, wbroadl = column_amounts(np.r_[p0, p1], wkl)
         input_builder = RRTMG_LW_INPUT(
             cxid="rrtmg input",
             iaer=0,
