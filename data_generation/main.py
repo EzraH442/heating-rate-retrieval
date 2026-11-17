@@ -32,16 +32,12 @@ def open_era5(input_dir: Path, year: int, month: int) -> xr.Dataset:
         datasets.append(xr.open_dataset(path))
 
     ds = xr.merge(datasets)
-    ds = ds.rename(
-        {
-            source: destination
-            for source, destination in {
-                "valid_time": "time",
-                "pressure_level": "level",
-            }.items()
-            if source in ds.dims
-        }
-    )
+    if "valid_time" in ds.dims:
+        if "time" in ds:
+            ds = ds.drop_vars("time")
+        ds = ds.rename({"valid_time": "time"})
+    if "pressure_level" in ds.dims:
+        ds = ds.rename({"pressure_level": "level"})
     if "expver" in ds:
         ds = ds.drop_vars("expver")
     return ds.sortby("level", ascending=False)
