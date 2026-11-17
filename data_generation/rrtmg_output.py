@@ -25,4 +25,5 @@ def read_rrtmg_output(f: TextIOBase, nlev, nband):
         i += (nlev + 1)
         i += 1
 
-    return toa_lw, htr_lw
+    # RRTMG prints layers from TOA down; our pressure coordinate is surface up.
+    return toa_lw, htr_lw[::-1]

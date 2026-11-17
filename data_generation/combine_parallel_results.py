@@ -70,7 +70,7 @@ def combine(paths: list[Path], output_path: Path) -> int:
             tqdm(paths, desc=output_path.name, unit="file")
         ):
             with Dataset(path) as source:
-                for varname in time_variables:
+                for varname in time_variable_names:
                     output.variables[varname][position] = source.variables[varname][0]
 
     return len(paths)

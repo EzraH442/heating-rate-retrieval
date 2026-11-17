@@ -173,7 +173,12 @@ def main():
                 output_file, nlev=len(pave), nband=nband
             )
             toa_flux_lw[index + (slice(None),)] = toa_lw
-            htr_lw[index + (slice(0, len(pave)),)] = profile_htr_lw
+            first_level = ds.sizes["level"] - (len(pave) - len(upper_p))
+            level_slice = slice(
+                first_level, ds.sizes["level"] + len(upper_p)
+            )
+            assert level_slice.stop - level_slice.start == len(profile_htr_lw)
+            htr_lw[index + (level_slice,)] = profile_htr_lw
 
     failed_cases_np = np.array(failed_cases)
 
