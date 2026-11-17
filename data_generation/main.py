@@ -32,16 +32,15 @@ def open_era5(input_dir: Path, year: int, month: int) -> xr.Dataset:
         datasets.append(xr.open_dataset(path))
 
     ds = xr.merge(datasets)
-    return ds.rename(
-        {
-            name: old
-            for name, old in {
-                "pressure_level": "level",
-                "valid_time": "time",
-            }.items()
-            if name in ds
-        }
-    )
+
+    # switch valid_time to time
+    for data_var in ds.data_vars:
+        if "valid_time" in ds[data_var].coords:
+            ds[data_var] = ds[data_var].swap_dims({"valid_time": "time"})
+
+    # remove the leftover valid_time coordinate (and expver if it's still attached to it)
+    ds = ds.drop_vars(["valid_time", "expver"])
+    return ds
 
 
 def create_output(path, name, ds, sample_dims, output_dim, output_coords):
@@ -76,8 +75,8 @@ def main():
                 f"time_index {args.time_index} is outside 0..{ds.sizes['time'] - 1}"
             )
         ds = ds.isel(time=slice(args.time_index, args.time_index + 1))
-    upper_p, upper_t, upper_q, upper_o3, interface_p, interface_t = (
-        load_upper_profile(args.upper_profile_path)
+    upper_p, upper_t, upper_q, upper_o3, interface_p, interface_t = load_upper_profile(
+        args.upper_profile_path
     )
 
     tmpdir = args.output_dir / "_tmp"

@@ -19,7 +19,7 @@ def main():
     parser.add_argument("--year", type=int, required=True)
     parser.add_argument("--task-id", type=int, default=os.getenv("SLURM_ARRAY_TASK_ID"))
     parser.add_argument("--input-dir", type=Path, default=Path("data/era5_6hr_2.5"))
-    parser.add_argument("--output-dir", type=Path, default=Path("data/rrtmg"))
+    parser.add_argument("--output-root", type=Path, default=Path("data/rrtmg"))
     parser.add_argument(
         "--upper-profile-path", type=Path, default=Path("data_qtqo3_123lvl.nc")
     )
@@ -29,7 +29,9 @@ def main():
 
     timestamp = timestamp_for_task(args.year, int(args.task_id))
     time_index = (timestamp.day - 1) * 4 + timestamp.hour // 6
-    output_dir = args.output_dir / str(args.year) / timestamp.strftime("%Y%m%dT%H")
+    output_dir = (
+        args.output_root / str(args.year) / timestamp.strftime("%Y%m%dT%H")
+    )
     marker = output_dir / "_SUCCESS"
     if marker.exists():
         print(f"Already complete: {output_dir}")
