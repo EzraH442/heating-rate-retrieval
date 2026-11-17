@@ -1,13 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=rrtmg
 #SBATCH --account=rrg-yihuang-ad
-# 365 days x 4 six-hourly timestamps per day = 1,460 tasks.
-# need to override the array with 0-1463 when computing values for a leap year
-#SBATCH --array=0-1459
+# One single-core array job per month (0 = January, 11 = December).
+#SBATCH --array=0-11
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=1G
 #SBATCH --ntasks=1
-#SBATCH --time=04:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=slurm-%x-%A_%a.out
 
 set -euo pipefail

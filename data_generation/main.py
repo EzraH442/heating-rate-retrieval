@@ -135,10 +135,10 @@ def main():
             idrv=0,
             imca=clouds,
             icld=clouds,
-            tbound=profile.skt.item(),  # sfc temp set of temp at bottom of first layer
-            iemis=0,  # each band has emissivity equal to 1.0
+            tbound=profile.skt.item(),
+            iemis=1,
             ireflect=0,  # only choice for RRTMG_LW
-            semiss=None,
+            semiss=np.array([0.98]),
             dtbound=None,  # only if idrv = 1
         )
         input_builder.set_fields_rrtatm0(

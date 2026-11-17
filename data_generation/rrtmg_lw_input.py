@@ -162,7 +162,7 @@ class RRTMG_LW_INPUT:
 
         # record 1.4
         if iemis > 0:
-            assert semiss != None
+            assert semiss is not None
             if iemis == 1:
                 assert len(semiss) == 1
             if iemis == 2:
@@ -397,8 +397,8 @@ class RRTMG_LW_INPUT:
     def _write_record_1_4(self, stream: TextIO):
         # record 1.4
         semiss_record = ""
-        if self.semiss != None:
-            self.semiss_str = "".join([f"{self.semiss[i]:5.3f}" for i in range(16)])
+        if self.semiss is not None:
+            semiss_record = "".join(f"{value:5.3f}" for value in self.semiss)
 
         stream.write(
             f"{self.tbound:10.3f}{self.iemis:2d}{self.ireflect:3d}{semiss_record}\n"
@@ -406,7 +406,7 @@ class RRTMG_LW_INPUT:
 
         # record 1.4.1
         if self.idrv:
-            assert self.dtbound != None
+            assert self.dtbound is not None
             stream.write(f"{self.dtbound:10.3f}\n")
 
     def _write_record_1_5(self, stream: TextIO):
