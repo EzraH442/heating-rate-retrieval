@@ -76,7 +76,8 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp: float, t2m: float):
     tave = t[mask]
     n_lev = len(pave)
 
-    # pressure at bottom
+    # pressure and temperature at bottom
+    tz0 = t2m
     pz0 = p0
 
     # top-of-layer pressure and temperatures
