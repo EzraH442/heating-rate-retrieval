@@ -2,9 +2,9 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
-from comet_ml import Experiment
 import torch
 import xarray as xr
+from comet_ml import Experiment
 from tap import Tap
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
@@ -15,6 +15,7 @@ from models import FNN, TransformerModel
 class Parser(Tap):
     data_dir: Path = Path("data/preprocessed")
     model: Literal["fnn", "transformer"] = "transformer"
+    input_variable: Literal["toa_flux_lw", "gpoints"] = "toa_flux_lw"
     epochs: int = 1
     batch_size: int = 1024
     learning_rate: float = 1e-3
@@ -45,7 +46,12 @@ class RRTMGDataset(Dataset):
         return self.fluxes[index], self.heating_rates[index]
 
 
-def load_data(data_dir: Path, train_year: int, test_year: int):
+def load_data(
+    data_dir: Path,
+    train_year: int,
+    test_year: int,
+    input_variable: str = "toa_flux_lw",
+):
     if train_year == test_year:
         raise ValueError("Training and testing years must differ")
 
@@ -62,9 +68,10 @@ def load_data(data_dir: Path, train_year: int, test_year: int):
             raise FileNotFoundError(f"No preprocessed data found for {year} in {data_dir}")
         for path in paths:
             with xr.open_dataset(path) as dataset:
-                x = dataset.toa_flux_lw.transpose(
-                    "time", "latitude", "longitude", "band"
-                ).values.reshape(-1, dataset.sizes["band"])
+                input_dimension = "gpoint" if input_variable == "gpoints" else "band"
+                x = dataset[input_variable].transpose(
+                    "time", "latitude", "longitude", input_dimension
+                ).values.reshape(-1, dataset.sizes[input_dimension])
                 y = dataset.htr_lw.transpose(
                     "time", "latitude", "longitude", "level"
                 ).values.reshape(-1, dataset.sizes["level"])
@@ -106,7 +113,7 @@ def main():
 
     torch.manual_seed(args.seed)
     train_fluxes, train_htr, test_fluxes, test_htr = load_data(
-        args.data_dir, args.train_year, args.test_year
+        args.data_dir, args.train_year, args.test_year, args.input_variable
     )
     if not len(train_fluxes):
         raise ValueError("No training profiles found")
@@ -160,6 +167,11 @@ def main():
             raise ValueError(
                 f"Checkpoint model is {checkpoint['model_name']!r}, not {args.model!r}"
             )
+        if checkpoint.get("input_variable", "toa_flux_lw") != args.input_variable:
+            raise ValueError(
+                f"Checkpoint input is {checkpoint.get('input_variable', 'toa_flux_lw')!r}, "
+                f"not {args.input_variable!r}"
+            )
         if args.model == "fnn" and checkpoint.get("hidden_layers", [128, 128]) != args.hidden_layers:
             raise ValueError(
                 f"Checkpoint hidden layers are {checkpoint.get('hidden_layers', [128, 128])}, "
@@ -205,6 +217,7 @@ def main():
         state = {
             "epoch": epoch,
             "model_name": args.model,
+            "input_variable": args.input_variable,
             "model_state": model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
             "best_validation_loss": best_validation_loss,
@@ -219,6 +232,8 @@ def main():
         checkpoint_name = args.model
         if args.model == "fnn":
             checkpoint_name += "_" + "x".join(map(str, args.hidden_layers))
+        if args.input_variable == "gpoints":
+            checkpoint_name += "_gpoints"
         save_checkpoint(args.checkpoint_dir / f"{checkpoint_name}_latest.pt", state)
         if is_best:
             save_checkpoint(args.checkpoint_dir / f"{checkpoint_name}_best.pt", state)
