@@ -25,7 +25,7 @@ class Parser(Tap):
 
 def open_era5(input_dir: Path, year: int, month: int) -> xr.Dataset:
     datasets = []
-    for var in ("o3", "q", "t", "sp", "skt"):
+    for var in ("o3", "q", "t", "sp", "skt", "t2m"):
         path = input_dir / var / f"{year}-{month:02d}.nc"
         if not path.exists():
             raise FileNotFoundError(path)
@@ -103,13 +103,15 @@ def main():
     failed_cases = []
     sample_shape = tuple(ds.sizes[dim] for dim in sample_dims)
 
-    # ~1.5 iterations per second on 1 cpu with 500M memory on rorqual
+    # ~45 iterations per second on 1 cpu with 500M memory on rorqual
     for index in tqdm(np.ndindex(*sample_shape), total=np.prod(sample_shape)):
         isel_arg = dict(zip(sample_dims, index))
         profile = ds.isel(isel_arg)
         clouds = 0
         pave, tave, p0, t0, p1, t1, wkl = prepare_era5_profile(
-            profile, profile.sp.item()
+            profile,
+            profile.sp.item(),
+            profile.t2m.item(),
         )
         pave, tave, p1, t1, wkl = patch_upper_layers(
             pave,
@@ -174,9 +176,7 @@ def main():
             )
             toa_flux_lw[index + (slice(None),)] = toa_lw
             first_level = ds.sizes["level"] - (len(pave) - len(upper_p))
-            level_slice = slice(
-                first_level, ds.sizes["level"] + len(upper_p)
-            )
+            level_slice = slice(first_level, ds.sizes["level"] + len(upper_p))
             assert level_slice.stop - level_slice.start == len(profile_htr_lw)
             htr_lw[index + (level_slice,)] = profile_htr_lw
 

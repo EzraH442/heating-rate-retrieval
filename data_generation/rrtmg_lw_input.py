@@ -6,6 +6,7 @@ import xarray as xr
 
 
 def load_upper_profile(path: Path):
+    # return (p, t, q, o3, pi, ti)
     profile = xr.load_dataset(path).data.values
     pressure, temperature, q, o3 = profile
     interface_indices = [0, 9, 18, 27, 36, 45]

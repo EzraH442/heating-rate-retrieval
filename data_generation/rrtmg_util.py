@@ -45,7 +45,7 @@ def vmr(q):
     return vmr
 
 
-def prepare_era5_profile(plev_ds: xr.Dataset, sp):
+def prepare_era5_profile(plev_ds: xr.Dataset, sp: float, t2m: float):
     """
     plev_ds: dataset containing:
       t: era5 temperature on pressure levels(t)
@@ -76,8 +76,7 @@ def prepare_era5_profile(plev_ds: xr.Dataset, sp):
     tave = t[mask]
     n_lev = len(pave)
 
-    # pressure and temperature at bottom
-    tz0 = t[0]
+    # pressure at bottom
     pz0 = p0
 
     # top-of-layer pressure and temperatures
