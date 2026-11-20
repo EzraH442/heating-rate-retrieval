@@ -1,0 +1,3 @@
+[submodule "RRTMG_LW"]
+	path = RRTMG_LW
+	url = git@github.com:EzraH442/RRTMG_LW.git
