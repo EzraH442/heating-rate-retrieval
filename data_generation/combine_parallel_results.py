@@ -95,9 +95,14 @@ def main():
         completed_outputs(year_dir, "toa_flux_lw.nc"),
         output_dir / f"toa_flux_lw_{args.year}.nc",
     )
-    if htr_count != flux_count:
+    gpoint_count = combine(
+        completed_outputs(year_dir, "gpoints.nc"),
+        output_dir / f"gpoints_{args.year}.nc",
+    )
+    if htr_count != flux_count or htr_count != gpoint_count:
         raise ValueError(
-            f"Heating rates have {htr_count} timestamps but fluxes have {flux_count}"
+            f"Output counts differ: heating rates={htr_count}, "
+            f"fluxes={flux_count}, g-points={gpoint_count}"
         )
     print(f"Combined {htr_count} timestamps into {output_dir}")
 

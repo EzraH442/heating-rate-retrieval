@@ -27,3 +27,8 @@ def read_rrtmg_output(f: TextIOBase, nlev, nband):
 
     # RRTMG prints layers from TOA down; our pressure coordinate is surface up.
     return toa_lw, htr_lw[::-1]
+
+
+def read_rrtmg_gpoint_output(f: TextIOBase, ngpoint=140):
+    rows = [line.split() for line in f.readlines()[1:]]
+    return np.array([float(row[4]) for row in rows])

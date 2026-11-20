@@ -5,7 +5,7 @@ import numpy as np
 import xarray as xr
 from netCDF4 import Dataset
 from rrtmg_lw_input import RRTMG_LW_INPUT, load_upper_profile, patch_upper_layers
-from rrtmg_output import read_rrtmg_output
+from rrtmg_output import read_rrtmg_gpoint_output, read_rrtmg_output
 from rrtmg_util import column_amounts, prepare_era5_profile
 from tap import Tap
 from tqdm import tqdm
@@ -83,6 +83,7 @@ def main():
     tmpdir.mkdir(exist_ok=True)
     sample_dims = ds.skt.dims
     nband = 16
+    ngpoint = 140
     levels = np.concatenate((ds.level, upper_p))
     toa_output, toa_flux_lw = create_output(
         args.output_dir / "toa_flux_lw.nc",
@@ -99,6 +100,14 @@ def main():
         sample_dims,
         "level",
         levels,
+    )
+    gpoint_output, gpoints = create_output(
+        args.output_dir / "gpoints.nc",
+        "gpoints",
+        ds,
+        sample_dims,
+        "gpoint",
+        np.arange(1, ngpoint + 1),
     )
     failed_cases = []
     sample_shape = tuple(ds.sizes[dim] for dim in sample_dims)
@@ -179,11 +188,16 @@ def main():
             level_slice = slice(first_level, ds.sizes["level"] + len(upper_p))
             assert level_slice.stop - level_slice.start == len(profile_htr_lw)
             htr_lw[index + (level_slice,)] = profile_htr_lw
+        with open(tmpdir / "OUTPUT_GPOINT", "rt") as output_file:
+            gpoints[index + (slice(None),)] = read_rrtmg_gpoint_output(
+                output_file, ngpoint
+            )
 
     failed_cases_np = np.array(failed_cases)
 
     toa_output.close()
     htr_output.close()
+    gpoint_output.close()
     np.savetxt(args.output_dir / "failed_cases.nc", failed_cases_np)
 
 

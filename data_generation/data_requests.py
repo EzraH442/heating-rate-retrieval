@@ -50,10 +50,7 @@ def all_days(year, month):
     return days
 
 
-c = cdsapi.Client(
-    url="https://cds.climate.copernicus.eu/api",
-    key="3dbc229c-81f7-4fd5-be2f-c6f193729ef5",
-)
+c = cdsapi.Client()
 
 
 def era5_request_plev(year: str, month: str, var: str, grid: str, out: Path):

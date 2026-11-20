@@ -41,8 +41,9 @@ def main():
         time_index = (timestamp.day - 1) * 4 + timestamp.hour // 6
         output_dir = args.output_root / str(args.year) / timestamp.strftime("%Y%m%dT%H")
         marker = output_dir / "_SUCCESS"
-        if marker.exists():
+        if marker.exists() and (output_dir / "gpoints.nc").exists():
             continue
+        marker.unlink(missing_ok=True)
 
         command = [
             sys.executable,
