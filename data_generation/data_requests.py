@@ -15,7 +15,9 @@ single_level_vars = {
     "ttr" : "top_net_thermal_radiation",
     "ttrc": "top_net_thermal_radiation_clear_sky",
     "strd": "surface_thermal_radiation_downwards_sky",
-    "strdc": "surface_thermal_radiation_downwards_clear_sky"
+    "strdc": "surface_thermal_radiation_downwards_clear_sky",
+    "str": "surface_net_thermal_radiation",
+    "strc": "surface_net_thermal_radiation_clear_sky",
 }
 
 pressure_level_vars = {
