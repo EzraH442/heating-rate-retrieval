@@ -137,7 +137,10 @@ def main():
         )
         wkl, wbroadl = column_amounts(np.r_[p0, p1], wkl)
         input_builder = RRTMG_LW_INPUT(
-            cxid="rrtmg input",
+            cxid=(
+                f"lat={profile.latitude.item():.2f}, "
+                f"lon={profile.longitude.item():.2f}"
+            ),
             iaer=0,
             iatm=0,
             ixsect=0,
