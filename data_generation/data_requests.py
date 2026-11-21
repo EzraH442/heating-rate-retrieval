@@ -14,6 +14,8 @@ single_level_vars = {
     "tsrc": "top_net_solar_radiation_clear_sky",
     "ttr" : "top_net_thermal_radiation",
     "ttrc": "top_net_thermal_radiation_clear_sky",
+    "strd": "surface_thermal_radiation_downwards_sky",
+    "strdc": "surface_thermal_radiation_downwards_clear_sky"
 }
 
 pressure_level_vars = {
@@ -92,7 +94,7 @@ if __name__ == "__main__":
     base_path = Path("data/era5_6hr_2.5")
     years = ["2011", "2012", "2013", "2014", "2015"]
     months = [f"{m:02d}" for m in range(1, 13)]
-    grid = '2.5/2.5'
+    grid = "2.5/2.5"
 
     for var in single_level_vars:
         (base_path / var).mkdir(parents=True, exist_ok=True)
