@@ -15,7 +15,7 @@ class Parser(Tap):
     year: int
     month: int
     time_index: int | None = None
-    input_dir: Path = Path("data/era5_6hr_1.0")
+    input_dir: Path = Path("data/era5_6hr_2.5")
     output_dir: Path = Path("data/rrtmg")
     upper_profile_path: Path = Path("data_qtqo3_123lvl.nc")
 
